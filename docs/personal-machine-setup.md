@@ -13,7 +13,7 @@ On macOS the desktop app's bundled CLI can also be used; ensure `codex` is on
 
 ```bash
 git clone --branch users/MhJoker3/codex-machine-setup \
-  https://github.com/MadSkittles/Router-Maestro.git
+  https://github.com/MhJoker3/Router-Maestro.git
 cd Router-Maestro
 uv sync --python 3.14 --locked --extra dev
 ```

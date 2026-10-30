@@ -309,6 +309,18 @@ def _build_codex_model_catalog(models: list[dict[str, Any]]) -> dict[str, Any] |
     extended_models = extended["models"]
     known_slugs = {model.get("slug") for model in extended_models if isinstance(model, dict)}
 
+    # Codex can select its bundled bare slugs even with an RM provider. Give
+    # unambiguous aliases the same limits as their provider-qualified entries.
+    by_bare_id: dict[str, dict[str, dict[str, Any]]] = {}
+    for model in models:
+        by_bare_id.setdefault(_bare_upstream_model_id(model), {})[_model_key(model)] = model
+    for entry in extended_models:
+        if not isinstance(entry, dict):
+            continue
+        candidates = by_bare_id.get(entry.get("slug"), {})
+        if len(candidates) == 1:
+            _apply_catalog_context_windows(entry, next(iter(candidates.values())))
+
     for priority, model in enumerate(models, start=1_000):
         slug = _model_key(model)
         if slug in known_slugs:
@@ -340,16 +352,20 @@ def _build_codex_model_catalog(models: list[dict[str, Any]]) -> dict[str, Any] |
         entry["experimental_supported_tools"] = []
         _apply_server_model_capabilities(entry, model)
         _apply_codex_model_capabilities(entry, model)
-        default_window, max_window = _catalog_context_windows(model)
-        if default_window is not None:
-            entry["context_window"] = default_window
-            entry["auto_compact_token_limit"] = None
-        if max_window is not None:
-            entry["max_context_window"] = max_window
+        _apply_catalog_context_windows(entry, model)
         extended_models.append(entry)
         known_slugs.add(slug)
 
     return extended
+
+
+def _apply_catalog_context_windows(entry: dict[str, Any], model: dict[str, Any]) -> None:
+    prompt_window, max_window = _catalog_context_windows(model)
+    if prompt_window is not None:
+        entry["context_window"] = prompt_window
+        entry["auto_compact_token_limit"] = None
+    if max_window is not None:
+        entry["max_context_window"] = max_window
 
 
 def _user_codex_has_router_maestro_provider(user_config_path: Path) -> bool:

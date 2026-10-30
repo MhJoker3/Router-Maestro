@@ -23,6 +23,14 @@ eligible attempts share that immutable instance. Streaming conversions decode
 and encode `SemanticEvent` values per frame instead of buffering a complete
 response.
 
+Copilot obfuscates Responses IDs independently in each SSE event. Its binding
+keeps the first response ID and correlates visible message IDs by `output_index`
+through item/part events and the final response snapshot. This prevents clients
+such as Codex from displaying the completed answer as a second message. The
+normalization is request-local and preserves message phases, unknown fields,
+and distinct messages with identical text. Reasoning IDs and encrypted content,
+as well as tool IDs and call IDs, retain their upstream continuation values.
+
 Routing and translation are independent decisions. `GenerationRoutePlan`
 contains provider/model candidates only; it never freezes a protocol
 conversion. `ProviderHandler` owns binding availability and transport order.

@@ -1,0 +1,21 @@
+services:
+  codex:
+    build:
+      context: .
+      dockerfile: Dockerfile.codex
+    working_dir: /workspace
+    init: true
+    stdin_open: true
+    tty: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - type: bind
+        source: .
+        target: /workspace
+      - codex-home:/home/node/.codex
+
+volumes:
+  codex-home:

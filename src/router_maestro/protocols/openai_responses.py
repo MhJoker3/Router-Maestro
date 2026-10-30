@@ -540,9 +540,9 @@ class OpenAIResponsesStreamDecoder:
         if self._model is not None and model != self._model:
             decode_reject(_PROTOCOL, f"{path}.model", "model changed within stream")
         # Copilot encrypts the Responses envelope ID independently on each SSE
-        # event.  Its raw identity binding remains untouched; only the
-        # provider-bound semantic decoder treats the first ID as the canonical
-        # stream identity and correlates later events by their typed indices.
+        # event. Its binding normalizes raw stream IDs; the provider-bound
+        # decoder also accepts unnormalized frames and correlates later events
+        # by their typed indices.
         if self._response_id is None:
             self._response_id = response_id
         self._model = model

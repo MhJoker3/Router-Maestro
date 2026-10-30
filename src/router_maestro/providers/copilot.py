@@ -62,7 +62,10 @@ from router_maestro.providers.copilot_support.catalog import (
     operation_capabilities as _catalog_operation_capabilities,
 )
 from router_maestro.providers.copilot_support.chat_codec import CopilotChatCodec
-from router_maestro.providers.copilot_support.responses_codec import CopilotResponsesCodec
+from router_maestro.providers.copilot_support.responses_codec import (
+    CopilotResponsesCodec,
+    CopilotResponsesStreamIdentity,
+)
 from router_maestro.providers.copilot_support.transport import CopilotTransport
 from router_maestro.providers.http_executor import SharedHttpExecutor
 from router_maestro.providers.outbound_contract import OutboundContract, ReasoningResolution
@@ -2542,6 +2545,20 @@ class CopilotHttpExecutor(SharedHttpExecutor):
     def __init__(self, provider: CopilotProvider) -> None:
         self.provider = provider
         super().__init__(transport_records_audit=True)
+
+    async def _iter_sse_data(
+        self,
+        lines: AsyncIterator[str],
+        attempt: PreparedAttempt,
+    ) -> AsyncIterator[Mapping[str, Any]]:
+        identity = (
+            CopilotResponsesStreamIdentity()
+            if attempt.protocol is WireProtocol.OPENAI_RESPONSES
+            else None
+        )
+        async with contextlib.aclosing(super()._iter_sse_data(lines, attempt)) as frames:
+            async for frame in frames:
+                yield identity.project(frame) if identity is not None else frame
 
     async def _send(self, attempt: PreparedAttempt, *, timeout: Any) -> httpx.Response:
         path = self._path(attempt)

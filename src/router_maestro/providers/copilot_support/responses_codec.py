@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Mapping
 from copy import deepcopy
 from typing import Any, NoReturn
 
@@ -35,6 +35,60 @@ _BENIGN_UPSTREAM_EVENTS = frozenset(
     }
 )
 _BENIGN_DONE_ITEM_TYPES = frozenset({"message"})
+
+
+class CopilotResponsesStreamIdentity:
+    """Keep client-visible IDs stable despite Copilot's per-event obfuscation."""
+
+    def __init__(self) -> None:
+        self.response_id: str | None = None
+        self.message_ids: dict[int, str] = {}
+
+    def project(self, frame: Mapping[str, Any]) -> Mapping[str, Any]:
+        result = dict(frame)
+        response = frame.get("response")
+        if isinstance(response, Mapping):
+            response = dict(response)
+            response_id = response.get("id")
+            if isinstance(response_id, str) and response_id:
+                if self.response_id is None:
+                    self.response_id = response_id
+                response["id"] = self.response_id
+            output = response.get("output")
+            if isinstance(output, list):
+                response["output"] = [self._message(item, i) for i, item in enumerate(output)]
+            result["response"] = response
+
+        index = frame.get("output_index")
+        if not isinstance(index, int) or isinstance(index, bool) or index < 0:
+            return result
+        if "item" in frame:
+            result["item"] = self._message(frame["item"], index)
+        item_id = frame.get("item_id")
+        if isinstance(item_id, str) and item_id:
+            event_type = frame.get("type")
+            part = frame.get("part")
+            is_message_part = (
+                isinstance(event_type, str)
+                and event_type.startswith(("response.output_text.", "response.refusal."))
+            ) or (
+                event_type in {"response.content_part.added", "response.content_part.done"}
+                and isinstance(part, Mapping)
+                and part.get("type") in {"output_text", "refusal"}
+            )
+            if index in self.message_ids or is_message_part:
+                result["item_id"] = self.message_ids.setdefault(index, item_id)
+        return result
+
+    def _message(self, item: Any, index: int) -> Any:
+        # Reasoning IDs are signed with encrypted_content; tool IDs/call_ids
+        # are continuation state. Only visible message IDs may be rewritten.
+        if not isinstance(item, Mapping) or item.get("type") != "message":
+            return item
+        item_id = item.get("id")
+        if not isinstance(item_id, str) or not item_id:
+            return item
+        return {**item, "id": self.message_ids.setdefault(index, item_id)}
 
 
 class CopilotResponsesCodec:

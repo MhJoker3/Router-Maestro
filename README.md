@@ -144,6 +144,13 @@ For Docker, a VPS, HTTPS, upgrades, and rollback, follow the
 follow the [Configuration Guide](docs/configuration.md). Both guides include
 prompts that can be pasted directly into an AI coding agent.
 
+For a Docker-based Codex development environment with Python and the project's
+locked dependencies, see
+[Codex CLI development container](docs/deployment.md#codex-cli-development-container).
+
+To reproduce this personal branch's Codex context and automatic-review settings
+on another machine, follow [Personal Codex setup](docs/personal-machine-setup.md).
+
 To delegate the work, start at
 [AI-assisted deployment](docs/deployment.md#ai-assisted-deployment) or
 [AI-assisted client configuration](docs/configuration.md#ai-assisted-client-configuration).

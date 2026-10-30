@@ -1,4 +1,4 @@
-.PHONY: help install dev test integration-test live-validation lint format clean build push run stop logs shell docker-up docker-down docker-logs buildx-setup build-multiarch dist publish publish-test dev-up dev-down dev-logs dev-build
+.PHONY: help install dev test integration-test live-validation lint format clean build push run stop logs shell docker-up docker-down docker-logs buildx-setup build-multiarch dist publish publish-test dev-up dev-down dev-logs dev-build codex-build codex codex-login codex-check
 
 # Variables
 VERSION := $(shell grep '^version' pyproject.toml | head -1 | cut -d'"' -f2)
@@ -46,6 +46,12 @@ help:
 	@echo "  make dev-down    Stop dev services"
 	@echo "  make dev-logs    View dev logs"
 	@echo "  make dev-build   Rebuild dev image (no cache)"
+	@echo ""
+	@echo "Codex CLI (Docker):"
+	@echo "  make codex-build Build the Codex development image"
+	@echo "  make codex-login Sign in with ChatGPT device authorization"
+	@echo "  make codex       Open Codex in this checkout (optional CODEX_ARGS)"
+	@echo "  make codex-check Verify Codex, Python, and project access"
 	@echo ""
 	@echo "Current version: $(VERSION)"
 
@@ -111,6 +117,24 @@ stop:
 	@echo "Use Ctrl+C to stop the server"
 
 # ============== Docker ==============
+
+codex-build:
+	docker compose -f docker-compose.codex.yml build codex
+
+codex:
+	docker compose -f docker-compose.codex.yml run --rm codex $(CODEX_ARGS)
+
+codex-login:
+	docker compose -f docker-compose.codex.yml run --rm codex \
+		-c 'cli_auth_credentials_store="file"' login --device-auth
+
+codex-check:
+	docker compose -f docker-compose.codex.yml run --rm --no-deps --entrypoint sh codex -ec \
+		'codex --version; python --version; uv --version; \
+		test -r /workspace/pyproject.toml; test -r /workspace/AGENTS.md; \
+		test "$$(git rev-parse --show-toplevel)" = /workspace; \
+		uv run --no-sync router-maestro --help >/dev/null; \
+		printf "Codex can read the project and run Router-Maestro.\n"'
 
 build:
 	docker build $(DOCKER_TAGS) .

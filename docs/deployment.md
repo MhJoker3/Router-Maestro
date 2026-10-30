@@ -118,6 +118,77 @@ docker compose -f docker-compose.dev.yml logs -f router-maestro
 
 The development Compose file also publishes only to `127.0.0.1`.
 
+## Codex CLI Development Container
+
+To use Codex to work on this checkout, rather than only run the Router-Maestro
+server, use the separate `docker-compose.codex.yml`. It includes Codex CLI
+0.165.0, Node.js 22, Python 3.14, uv 0.13.6, Git, ripgrep, and the project's
+locked development dependencies. It does not change the server Compose files.
+
+Install and start Docker Desktop (Apple Silicon on arm64 Macs), or Docker Engine
+with Compose v2 on Linux. Wait until `docker info` succeeds, then run from the
+repository root:
+
+```bash
+make codex-build
+make codex-check
+make codex-login
+make codex
+```
+
+`codex-check` checks the CLI versions, reads the bind-mounted project's
+`pyproject.toml` and `AGENTS.md`, and invokes the Router-Maestro CLI. It needs no
+OpenAI account and makes no model request. `codex-login` prints a device
+authorization URL and code: open the URL in a browser and complete authorization
+with your own ChatGPT account. Enable device-code authentication in your ChatGPT
+security settings if prompted. Installing or signing into the ChatGPT desktop
+app does not automatically sign the container into Codex.
+
+Credentials and Codex session state are stored in the Compose-managed
+`codex-home` Docker volume, not in the repository or image. Do not export that
+volume, paste its contents into logs, or run `docker compose -f
+docker-compose.codex.yml down --volumes` unless you intend to delete its login
+and session state. The image build context includes only the Python manifest,
+lockfile, README, and package source, excluding local credentials and `.env`.
+
+The container runs as non-root, drops Linux capabilities, and has no Docker
+socket or host home-directory mount. Only this checkout is bind-mounted at
+`/workspace`; edits there persist on the host. This is a trusted-checkout
+development environment, not isolation from secrets already inside that
+checkout. Keep Codex's normal approval and sandbox protections enabled. On
+Linux, ensure UID 1000 can write the checkout before starting; do not make the
+checkout world-writable.
+
+Pass extra Codex arguments or run development commands in the same image:
+
+```bash
+make codex CODEX_ARGS='--help'
+docker compose -f docker-compose.codex.yml run --rm \
+  --entrypoint bash codex
+docker compose -f docker-compose.codex.yml run --rm \
+  --entrypoint uv codex run --no-sync pytest tests/test_auth.py -q
+```
+
+After changing `pyproject.toml` or `uv.lock`, rebuild with `make codex-build`.
+The virtual environment lives in the image at `/opt/venv`, so the host's
+`.venv` is not used. No host Python, Node.js, uv, or Codex installation is
+required.
+
+After login, verify a real model request with a fresh session:
+
+```bash
+make codex CODEX_ARGS='exec --sandbox read-only "Read pyproject.toml and report the package name. Do not modify files."'
+```
+
+That command sends the prompt and selected project context to the configured
+Codex provider and may consume account usage. Successful `codex-check` alone
+does not verify account access or model generation. This container defaults to
+Codex's own provider; routing Codex through Router-Maestro additionally requires
+a running, authenticated server and the existing
+[client configuration flow](configuration.md). Inside a container,
+`localhost` refers to that container, not the Mac host; use
+`host.docker.internal` for an existing host service on Docker Desktop.
+
 ## Production HTTPS with Docker Compose
 
 The repository's `docker-compose.yml` runs:
